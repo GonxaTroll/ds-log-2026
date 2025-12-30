@@ -14,6 +14,6 @@ Each week folder contains:
 - Files and code related to that week's topics
 
 ## Usage
-1. Create a new folder for each week using the format `wXX_topic_name` (e.g., `w01_python_basics`, `w02_sql_queries`)
+1. Create a new folder for each week using the format `wXX_topic_name` where XX is zero-padded (e.g., `w01_python_basics`, `w02_sql_queries`, `w10_advanced_algorithms`)
 2. Add your work files and documentation for that week
 3. Update the week's README.md with relevant information about the topic and your progress
