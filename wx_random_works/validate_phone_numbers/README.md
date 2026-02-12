@@ -1,0 +1,1 @@
+Just a small trial script using Neutrino API to validate phone numbers.
