@@ -1,11 +1,13 @@
+"""scraper.py
+This module contains the scraper classes for MyAnimeList.
+"""
 import json
 import re
-import requests
 import time
-import traceback
+from datetime import datetime
+import requests
 import pandas as pd
 from bs4 import BeautifulSoup
-from datetime import datetime
 
 class MyAnimeListForumScraper:
     def __init__(self):
@@ -15,7 +17,8 @@ class MyAnimeListForumScraper:
         forum = requests.get(forum_topic, timeout = 10)
         forum = BeautifulSoup(forum.content, "lxml")
         pages = forum.find("div", class_ = "pages")
-        pages = int(re.findall(r"Pages \((\d+)\)", pages.text)[0])
+        pages = re.findall(r"Pages \((\d+)\)", pages.text)
+        pages = int(pages[0]) if pages else 0
         return pages
 
     def _get_message_data(self, forum_topic):
@@ -93,7 +96,7 @@ class ScraperRestClient:
         response = requests.get(endpoint, timeout = 10)
         if response.status_code == 200:
             return response
-        raise Exception(response.status_code,
+        raise requests.exceptions.RequestException(
                         f"Request to {endpoint} failed with status code {response.status_code}")
 
     def _parse_json_from_api(self, response: str):
@@ -125,15 +128,16 @@ class JikanClient(ScraperRestClient):
                 data = response.get("data", [])
                 has_next_page = response.get("pagination", {}).get("has_next_page", True)
                 time.sleep(1)  # to avoid rate limiting
-            except:
-                _, exc_value, _ = traceback.sys.exc_info()
-                status_code = exc_value.args[0]
+            except requests.exceptions.RequestException as exc:
+                status_code = exc.args[0] if exc.args else None
                 if status_code == 429:
                     print("Rate limit exceeded. Waiting before retrying...")
-                    time.sleep(60) # since we are not paralelizing, the 1 second wait is not necessary, we can just wait the full minute
+                    time.sleep(60)
+                    # since we are not paralelizing, the 1 second wait is not necessary,
+                    # we can just wait the full minute
                     continue
                 else:
-                    raise Exception(f"Failed to fetch page {page}.")
+                    raise RuntimeError(f"Failed to fetch page {page}.") from exc
             if not data:
                 break
             all_data.extend(data)
@@ -149,19 +153,10 @@ class AnimeScraper(JikanClient):
     def get_full_payload(self):
         return self.get_parsed_json_from_api(f"/anime/{self.anime_id}/full")
 
-    def get_episodes(self):
+    def get_episodes(self) -> pd.DataFrame:
         episodes = pd.DataFrame(
             self.get_all_pages_from_endpoint(f"/anime/{self.anime_id}/episodes")
         )
-        if episodes.empty:
-            return pd.DataFrame(columns = ["anime_id", "id", "title", "title_japanese", "aired",
-                                           "score", "filler", "recap", "forum_topic_id", "url",
-                                           "title_romanji"])
-        episodes["forum_topic_id"] = episodes["forum_url"].apply(
-            lambda x: int(re.search(r'topicid=(\d+)', x).group(1))
-        )
-        episodes = episodes.drop(columns=["forum_url"])
-        episodes["anime_id"] = self.anime_id
         return episodes
 
     def get_statistics(self):
@@ -187,17 +182,19 @@ class AnimeScraper(JikanClient):
 
     def _get_reviews_df(self, data):
         data_normalized = pd.json_normalize(data)
+        if pd.DataFrame(data).empty:
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
         # 1. Main Reviews
         reviews = pd.DataFrame(data).drop(columns=['reactions', 'user'])
-        reviews["username"] = data_normalized['user.username']
-        reviews["anime_id"] = self.anime_id
+        reviews.loc[:, "username"] = data_normalized['user.username']
+        reviews.loc[:, "anime_id"] = self.anime_id
 
         # 2. Reactions (using mal_id as the foreign key)
         reaction_cols = [col for col in data_normalized if col.startswith('reactions.')]
         reactions = data_normalized[['mal_id'] + reaction_cols]
         reactions = reactions.rename(columns=lambda x: x.replace('reactions.', ''))
-        reactions["anime_id"] = self.anime_id
+        reactions.loc[:, "anime_id"] = self.anime_id
 
         # 3. Users
         users = data_normalized[['user.username', 'user.url', 'user.images.jpg.image_url']]
@@ -212,7 +209,7 @@ class AnimeScraper(JikanClient):
     def get_user_updates(self):
         return self.get_all_pages_from_endpoint(f"/anime/{self.anime_id}/userupdates")
 
-    def get_forum_messages(self, topic_id: int):
+    def get_forum_messages(self, topic_id: int) -> pd.DataFrame:
         forum_messages = self.forum_scraper.get_forum_messages(topic_id)
         forum_messages["anime_id"] = self.anime_id
         return forum_messages
@@ -282,97 +279,47 @@ class AnimeScraperFormatterDF(AnimeScraper):
 
         return show_info_df, show_genres_df, show_themes_df, anime_relations_df
 
-    def get_episodes(self):
-        anime_episodes = super().get_episodes()
-        # 'https://myanimelist.net/anime/54492/Kusuriya_no_Hitorigoto/episode/1'
-        anime_episodes = anime_episodes.rename(columns = {
-            "mal_id": "id",
-        }).drop(columns = ["url", "title_romanji"])
-
-        columns = [
-            "anime_id", "id", "title", "title_japanese", "aired", "score", "filler", "recap",
-            "forum_topic_id"
-        ]
-        anime_episodes = anime_episodes[columns]
-        anime_episodes["aired"] = pd.to_datetime(anime_episodes["aired"], errors = "coerce")
-        return anime_episodes
+    def get_episodes(self): # 'https://myanimelist.net/anime/54492/Kusuriya_no_Hitorigoto/episode/1'
+        episodes = super().get_episodes()
+        theoretical_columns = ["anime_id", "id", "title", "title_japanese", "aired", "score",
+                               "filler", "recap", "forum_topic_id"]
+        if episodes.empty:
+            return pd.DataFrame(columns = theoretical_columns)
+        # episodes = pd.DataFrame(episodes) if not isinstance(episodes, pd.DataFrame) else episodes
+        episodes = episodes.rename(columns = {"mal_id": "id"})
+        episodes.loc[:, "anime_id"] = self.anime_id
+        if "forum_url" in episodes.columns:
+            episodes.loc[:, "forum_topic_id"] = episodes.loc[:, "forum_url"].apply(
+                lambda x: int(re.search(r'topicid=(\d+)', x).group(1))
+            )
+        episodes = episodes.reindex(columns = theoretical_columns)
+        episodes["aired"] = pd.to_datetime(episodes["aired"], errors = "coerce")
+        episodes = episodes[theoretical_columns]
+        return episodes
 
     def get_reviews(self, preliminary: bool = True, spoilers: bool = True):
+        # https://myanimelist.net/reviews.php?id=505601
         reviews, reactions, users = super().get_reviews(preliminary = preliminary,
                                                         spoilers = spoilers)
-
-        # https://myanimelist.net/reviews.php?id=505601
-        reviews = reviews.rename(columns = {"mal_id": "id"})
-        reviews["date"] = pd.to_datetime(reviews["date"], errors = "coerce")
-        reviews = reviews[[
-            "anime_id", "id", "type", "review", "score", "tags", "is_spoiler", "is_preliminary",
-            "username", "date"
-        ]]
-
-        # reactions
-        columns = [
-            "anime_id", "id", "overall", "nice", "love_it", "funny", "confusing", "informative",
-            "well_written", "creative"
-        ]
-        reactions = reactions.rename(columns = {"mal_id": "id"})[columns]
-
+        review_columns = ["anime_id", "id", "type", "review", "score", "tags", "is_spoiler",
+                          "is_preliminary", "username", "date"]
+        reaction_columns = ["anime_id", "id", "overall", "nice", "love_it", "funny", "confusing",
+                            "informative", "well_written", "creative"]
+        if reviews.empty:
+            reviews = pd.DataFrame(columns = review_columns)
+        else:
+            reviews["date"] = pd.to_datetime(reviews["date"], errors = "coerce")
+            reviews = reviews.rename(columns = {"mal_id": "id"}).loc[:, review_columns]
+        if reactions.empty:
+            reactions = pd.DataFrame(columns = reaction_columns)
+        else:
+            reactions = reactions.rename(columns = {"mal_id": "id"}).loc[:, reaction_columns]
         return reviews, reactions, users
 
-    def get_forum_messages(self, topic_id: int):
-        forum_messages = super().get_forum_messages(topic_id)
+    def get_forum_messages(self, topic_id: int) -> pd.DataFrame:
+        forum_messages: pd.DataFrame = super().get_forum_messages(topic_id)
         forum_messages = forum_messages.rename(columns = {"anime_id": "show_id"})
-        columns = [
-            "show_id", "forum_id", "id", "user", "datetime", "replied_id", "content",
-            "additional_media"
-        ]
-        forum_messages = forum_messages[columns]
+        columns = ["show_id", "forum_id", "id", "user", "datetime", "replied_id", "content",
+                   "additional_media"]
+        forum_messages = forum_messages.loc[:, columns]
         return forum_messages
-
-
-    # def get_statistics(self):
-    #     statistics = self.get_parsed_json_from_api(f"/anime/{self.anime_id}/statistics")["data"]
-    #     statistics_df = []
-    #     for kpi_value in statistics:
-    #         if kpi_value != "scores":
-    #             statistics_df.append({
-    #                 "kpi_name": "watching_status",
-    #                 "kpi_value": kpi_value,
-    #                 "amount": statistics[kpi_value]
-    #             })
-    #         else:
-    #             for score in statistics[kpi_value]:
-    #                 statistics_df.append({
-    #                     "kpi_name": "score",
-    #                     "kpi_value": f"score_{score['score']}",
-    #                     "amount": score["votes"]
-    #                 })
-    #     statistics_df = pd.DataFrame(statistics_df)
-    #     statistics_df["anime_id"] = self.anime_id
-    #     return statistics_df
-
-    # def _get_reviews_df(self, data):
-    #     data_normalized = pd.json_normalize(data)
-
-    #     # 1. Main Reviews
-    #     reviews = pd.DataFrame(data).drop(columns=['reactions', 'user'])
-    #     reviews["username"] = data_normalized['user.username']
-    #     reviews["anime_id"] = self.anime_id
-
-    #     # 2. Reactions (using mal_id as the foreign key)
-    #     reaction_cols = [col for col in data_normalized if col.startswith('reactions.')]
-    #     reactions = data_normalized[['mal_id'] + reaction_cols]
-    #     reactions = reactions.rename(columns=lambda x: x.replace('reactions.', ''))
-    #     reactions["anime_id"] = self.anime_id
-
-    #     # 3. Users
-    #     users = data_normalized[['user.username', 'user.url', 'user.images.jpg.image_url']]
-    #     users = users.drop_duplicates(subset='user.username')
-    #     return reviews, reactions, users
-
-    # def get_reviews(self, preliminary: bool = True, spoilers: bool = True):
-    #     query_params = f"?preliminary={str(preliminary).lower()}&spoilers={str(spoilers).lower()}"
-    #     data = self.get_all_pages_from_endpoint(f"/anime/{self.anime_id}/reviews{query_params}")
-    #     return self._get_reviews_df(data)
-
-    # def get_user_updates(self):
-    #     return self.get_all_pages_from_endpoint(f"/anime/{self.anime_id}/userupdates")
