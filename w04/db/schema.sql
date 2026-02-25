@@ -95,4 +95,12 @@ create table if not exists forum_messages (
     content varchar,
     additional_media integer,
     primary key (show_id, forum_id, id)
-)
+);
+
+create table if not exists anime_statistics (
+    anime_id integer,
+    kpi_name varchar,
+    kpi_value varchar,
+    amount integer,
+    primary key (anime_id, kpi_name, kpi_value)
+);

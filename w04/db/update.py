@@ -2,6 +2,8 @@ import pandas as pd
 
 def upsert_show_info(anime_conn, info: pd.DataFrame, genres: pd.DataFrame,
                      themes: pd.DataFrame, relations: pd.DataFrame):
+    assert isinstance(info, pd.DataFrame) and isinstance(genres, pd.DataFrame) and\
+        isinstance(themes, pd.DataFrame) and isinstance(relations, pd.DataFrame)
 
     upsert_info = """
         INSERT INTO show_info
@@ -76,6 +78,7 @@ def upsert_show_info(anime_conn, info: pd.DataFrame, genres: pd.DataFrame,
     anime_conn.execute(upsert_relations)
 
 def upsert_episodes(anime_conn, episodes: pd.DataFrame):
+    assert isinstance(episodes, pd.DataFrame)
     query = """
         insert into anime_episodes
         select
@@ -102,6 +105,7 @@ def upsert_episodes(anime_conn, episodes: pd.DataFrame):
 
 
 def upsert_reviews(anime_conn, reviews_df: pd.DataFrame, review_reactions_df: pd.DataFrame):
+    assert isinstance(reviews_df, pd.DataFrame) and isinstance(review_reactions_df, pd.DataFrame)
     query_reviews =\
         """
         insert into reviews
@@ -157,6 +161,8 @@ def upsert_reviews(anime_conn, reviews_df: pd.DataFrame, review_reactions_df: pd
 
 
 def upsert_forum_messages(anime_conn, forum_messages_df: pd.DataFrame):
+    assert isinstance(forum_messages_df, pd.DataFrame)
+
     forum_query =\
     """
     insert into forum_messages
@@ -178,3 +184,20 @@ def upsert_forum_messages(anime_conn, forum_messages_df: pd.DataFrame):
         additional_media = excluded.additional_media;
     """
     anime_conn.execute(forum_query)
+
+
+def upsert_anime_statistics(anime_conn, statistics_df: pd.DataFrame) -> None:
+    assert isinstance(statistics_df, pd.DataFrame)
+    statistics_query =\
+        """
+        insert into anime_statistics
+        select
+            anime_id,
+            kpi_name,
+            kpi_value,
+            amount
+        from statistics_df
+        on conflict (anime_id, kpi_name, kpi_value) do update set
+            amount = excluded.amount;
+        """
+    anime_conn.execute(statistics_query)

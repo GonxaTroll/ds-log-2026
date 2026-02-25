@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from config.config import ANIME_DB_PATH
 from db.build_db import build_anime_db
-from db.update import upsert_show_info, upsert_episodes, upsert_reviews, upsert_forum_messages
+from db.update import upsert_anime_statistics, upsert_show_info, upsert_episodes, upsert_reviews, upsert_forum_messages
 from scraper import AnimeScraperFormatterDF
 
 
@@ -24,6 +24,10 @@ def store_all_anime_info(anime_id: int):
         .empty:
         info, genres, themes, relations  = anime_client.get_full_payload()
         upsert_show_info(anime_conn, info, genres, themes, relations)
+    # Get statistics:
+    if anime_conn.execute(f"select * from anime_statistics where anime_id = {anime_id}").df().empty:
+        anime_stats = anime_client.get_statistics()
+        upsert_anime_statistics(anime_conn, anime_stats)
     # Get episodes:
     if anime_conn.execute(f"select * from anime_episodes where anime_id = {anime_id}").df().empty:
         episodes = anime_client.get_episodes()
