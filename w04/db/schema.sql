@@ -19,7 +19,6 @@ create table if not exists show_info (
     primary key (id, type)
 );
 
-
 create table if not exists show_relationships (
     source_id integer,
     id integer,
