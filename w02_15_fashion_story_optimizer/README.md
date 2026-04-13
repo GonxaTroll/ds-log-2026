@@ -19,6 +19,14 @@ In order to use this code, you can modify and run the [main.py](main.py) script.
 ```
 uv run main.py
 ```
+  
+    
+# Week 15 - Fashion story full version
+Project allocated in the new [fashion story repo](https://github.com/GonxaTroll/fashion-story-optimizer).
+
+It is a web app that allows the user to input all their available hours in the calendar and proceed with the optimization, based on some settings.
+
+Created frontend with React and backend with FastAPI, being the former mostly done with Claude code.
 
 ## Topics Covered
 - Optimization. Scheduling problems.
