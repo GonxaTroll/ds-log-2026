@@ -1,0 +1,13 @@
+# version: 'version'
+
+services:
+  database:
+    image: mysql:latest
+    ports:
+      - 3306:3306
+    volumes:
+      - ./init.sql:/data/application/init.sql
+      - ./data:/var/lib/mysql
+    command: --init-file /data/application/init.sql
+    env_file:
+      - .env

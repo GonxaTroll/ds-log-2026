@@ -1,0 +1,17 @@
+[project]
+name = "validate-phone-numbers"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "neutrino-api-client-requests",
+]
+
+[tool.uv.sources]
+neutrino-api-client-requests = { git = "https://github.com/NeutrinoAPI/neutrino-api-client-requests" }
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.2.0",
+]
