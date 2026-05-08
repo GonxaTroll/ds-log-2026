@@ -17,3 +17,6 @@ Each week folder contains:
 1. Create a new folder for each week using the format `wXX_topic_name` where XX is zero-padded (e.g., `w01_python_basics`, `w02_sql_queries`, `w10_advanced_algorithms`)
 2. Add your work files and documentation for that week
 3. Update the week's README.md with relevant information about the topic and your progress
+
+## Kaggle notebooks:
+- [Site Revenue A/B Test with Permutation Strategy](https://www.kaggle.com/code/gonxatroll/site-revenue-a-b-test-with-permutation-strategy) (2026-04-20)
