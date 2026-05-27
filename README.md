@@ -19,4 +19,5 @@ Each week folder contains:
 3. Update the week's README.md with relevant information about the topic and your progress
 
 ## Kaggle notebooks:
+- [CookieCats A/B Test - Retention vs Monetization](https://www.kaggle.com/code/gonxatroll/cookiecats-a-b-test-retention-vs-monetization) (2026-05-28)
 - [Site Revenue A/B Test with Permutation Strategy](https://www.kaggle.com/code/gonxatroll/site-revenue-a-b-test-with-permutation-strategy) (2026-04-20)
