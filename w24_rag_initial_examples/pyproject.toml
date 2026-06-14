@@ -1,0 +1,35 @@
+[project]
+name = "w24-rag-initial-examples"
+version = "0.1.0"
+description = "RAG pipeline with LangChain, FAISS, and cross-encoder reranking"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "torch>=2.3.0",
+    "transformers>=4.46.0",
+    "accelerate>=1.0.0",
+    "sentence-transformers>=3.0.0",
+    "langchain>=0.3.0",
+    "langchain-community>=0.3.0",
+    "langchain-text-splitters>=0.3.0",
+    "langchain-huggingface>=0.1.0",
+    "langchain-core>=0.3.0",
+    "faiss-cpu>=1.9.0",
+    "pymupdf>=1.24.0",
+    "pydantic>=2.0.0",
+    "langchain-google-genai>=4.2.5",
+    "langchain-google-vertexai>=3.2.4",
+    "ipywidgets>=8.1.8",
+    "ragas",
+    "requests>=2.34.2",
+    "matplotlib>=3.11.0",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.1.0",
+    "jupyterlab>=4.0.0",
+]
+
+[tool.uv.sources]
+ragas = { git = "https://github.com/GoldSharon/ragas.git" }
